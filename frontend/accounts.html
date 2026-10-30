@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+		<title>Accounts</title>
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-title" content="Accounts" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+		<meta name="theme-color" content="#ffffff" />
+		<link rel="icon" type="image/png" sizes="196x196" href="/assets/erp_overrides/manifest/favicon-196.png" />
+		<link rel="apple-touch-icon" href="/assets/erp_overrides/manifest/apple-icon-180.png" />
+	</head>
+	<body class="antialiased bg-gray-50">
+		<div id="app"></div>
+		<div id="modals"></div>
+		<div id="popovers"></div>
+
+		<script>
+			window.csrf_token = "{{ csrf_token }}"
+			window.site_name = "{{ site_name }}"
+			if (!window.frappe) window.frappe = {}
+			frappe.boot = {{ boot }}
+		</script>
+
+		<script type="module" src="/src/accounts/main.js"></script>
+	</body>
+</html>

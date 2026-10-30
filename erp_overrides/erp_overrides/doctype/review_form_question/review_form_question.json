@@ -1,0 +1,79 @@
+{
+ "actions": [],
+ "creation": "2026-10-21 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "label",
+  "help",
+  "kind",
+  "options",
+  "answered_by",
+  "required",
+  "criteria"
+ ],
+ "fields": [
+  {
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "label": "Question",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "help",
+   "fieldtype": "Small Text",
+   "label": "Help text"
+  },
+  {
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Answer",
+   "options": "Rating\nText\nYes / No\nChoice",
+   "default": "Rating",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "options",
+   "fieldtype": "Small Text",
+   "label": "Choices",
+   "description": "One per line, for Choice",
+   "depends_on": "eval:doc.kind==\"Choice\""
+  },
+  {
+   "fieldname": "answered_by",
+   "fieldtype": "Select",
+   "label": "Answered by",
+   "options": "Employee\nManager\nBoth",
+   "default": "Employee",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "required",
+   "fieldtype": "Check",
+   "label": "Required",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "criteria",
+   "fieldtype": "Link",
+   "label": "Appraisal criterion",
+   "options": "Employee Feedback Criteria",
+   "description": "For a manager's Rating: the appraisal criterion it counts towards"
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-21 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Erp Overrides",
+ "name": "Review Form Question",
+ "owner": "Administrator",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "permissions": [],
+ "istable": 1,
+ "editable_grid": 1
+}

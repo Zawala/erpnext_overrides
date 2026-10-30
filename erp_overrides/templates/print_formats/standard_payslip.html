@@ -1,0 +1,71 @@
+{#- "Standard Payslip" payslip (patch payslip_standard_2026_10): a classic one-page
+    payslip layout. Figures come from standard_payslip(doc),
+    erp_overrides/payslip.py. -#}
+{%- set p = standard_payslip(doc) -%}
+<style>
+	.payslip-doc { font-family: "Times New Roman", "Liberation Serif", Times, serif; font-size: 10pt; color: #000; }
+	.payslip-doc .logo { text-align: center; margin-bottom: 14px; }
+	.payslip-doc .logo img { height: 66px; }
+	.payslip-doc h1 { text-align: center; color: #1F3864; font-size: 16pt; font-weight: bold; margin: 0; }
+	.payslip-doc .period { text-align: center; color: #666666; font-style: italic; margin: 2px 0 18px; }
+	.payslip-doc table { width: 100%; border-collapse: collapse; margin-bottom: 22px; page-break-inside: avoid; }
+	.payslip-doc td { border: 1px solid #BFBFBF; padding: 4px 6px; width: 55%; }
+	.payslip-doc td + td { text-align: right; width: 45%; }
+	.payslip-doc th { background: #1F3864; color: #FFFFFF; text-align: left; font-weight: bold; padding: 6px; border: 1px solid #1F3864; }
+	.payslip-doc td:first-child { font-weight: bold; }
+	.payslip-doc tr.total td { background: #D9E1F2; font-weight: bold; }
+	.payslip-doc table.net td { background: #C6E0B4; font-size: 12pt; font-weight: bold; padding: 8px 6px; }
+	.payslip-doc table.leave td, .payslip-doc table.leave th + th { width: 20%; text-align: right; }
+	.payslip-doc table.leave td:first-child { width: 60%; text-align: left; }
+	.payslip-doc .note { color: #666666; font-style: italic; font-size: 8pt; }
+</style>
+<div class="payslip-doc">
+	{%- if p.logo %}<div class="logo"><img src="{{ p.logo }}" alt="{{ p.company | e }}"></div>{% endif %}
+	<h1>PAYSLIP</h1>
+	<div class="period">Pay Period: {{ p.period }}</div>
+
+	<table>
+		<tr><th colspan="2">EMPLOYEE DETAILS</th></tr>
+		{%- for label, value in p.details %}
+		<tr><td>{{ label | e }}</td><td>{{ value | e }}</td></tr>
+		{%- endfor %}
+	</table>
+
+	<table>
+		<tr><th colspan="2">EARNINGS</th></tr>
+		{%- for row in p.earnings %}
+		<tr><td>{{ row.label | e }}</td><td>{{ row.amount }}</td></tr>
+		{%- endfor %}
+		<tr class="total"><td>GROSS PAY</td><td>{{ p.gross }}</td></tr>
+	</table>
+
+	<table>
+		<tr><th colspan="2">DEDUCTIONS</th></tr>
+		{%- for row in p.deductions %}
+		<tr><td>{{ row.label | e }}</td><td>{{ row.amount }}</td></tr>
+		{%- endfor %}
+		<tr class="total"><td>TOTAL DEDUCTIONS</td><td>{{ p.total_deductions }}</td></tr>
+	</table>
+
+	<table class="net">
+		<tr><td>NET PAY</td><td>{{ p.net }}</td></tr>
+	</table>
+
+	{%- if p.leave %}
+	<table class="leave">
+		<tr><th>LEAVE BALANCES (DAYS)</th><th>Used</th><th>Available</th></tr>
+		{%- for leave_type, used, available in p.leave %}
+		<tr><td>{{ leave_type | e }}</td><td>{{ used }}</td><td>{{ available }}</td></tr>
+		{%- endfor %}
+	</table>
+	{%- endif %}
+
+	<table>
+		<tr><th colspan="2">BANKING &amp; MEDICAL AID</th></tr>
+		{%- for label, value in p.banking %}
+		<tr><td>{{ label | e }}</td><td>{{ value | e }}</td></tr>
+		{%- endfor %}
+	</table>
+
+	<p class="note">This is a computer-generated payslip issued by {{ p.company | e }}. Please retain for your records.</p>
+</div>

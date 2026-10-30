@@ -1,0 +1,49 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&display=swap");
+@import "frappe-ui/src/style.css";
+
+/* Soft UI accent, shared with the /launcher page: one blue-to-indigo gradient for whatever
+   is selected or primary, Montserrat for headings and navigation (data stays in Inter,
+   which is narrower and keeps tables fitting on a phone). */
+:root {
+	--accent-from: #2b8ae6;
+	--accent-to: #3b2df5;
+	--accent: #3437ef;
+	--accent-gradient: linear-gradient(90deg, var(--accent-from), var(--accent-to));
+	--soft-ground: #eef2f6;
+}
+
+.app-bg {
+	background-color: var(--soft-ground);
+}
+
+h1, h2, .font-display, aside nav, .nav-active {
+	font-family: Montserrat, "InterVar", "Inter", system-ui, sans-serif;
+}
+
+/* sidebar: the current page is a gradient pill */
+.nav-active {
+	background-image: var(--accent-gradient);
+	color: #fff !important;
+	box-shadow: 0 8px 16px -8px rgba(59, 45, 245, 0.6);
+}
+.nav-active svg {
+	color: #fff;
+}
+/* phone tab bar: the current tab is accent-coloured */
+.tab-active {
+	color: var(--accent) !important;
+}
+
+/* selected chips, segmented controls, steps, progress and "today" (all bg-gray-900 in the
+   templates) and frappe-ui solid buttons take the gradient */
+.bg-gray-900,
+.bg-surface-gray-7 {
+	background-color: var(--accent) !important;
+	background-image: var(--accent-gradient);
+}
+.border-gray-900 {
+	border-color: transparent !important;
+}
+.bg-surface-gray-7:hover {
+	filter: brightness(1.08);
+}

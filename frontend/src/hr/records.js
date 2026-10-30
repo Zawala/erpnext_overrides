@@ -1,0 +1,172 @@
+/**
+ * Read-mostly lists and records: the history behind the inboxes and the lifecycle
+ * forms. Actions happen in the Inbox, Leave, Payroll and People pages; these show
+ * what happened, filtered the way HR looks for them.
+ *
+ * columns: { key, label, format: date|money|days }   sections: { label, fields: [[fieldname, label, format]] }
+ * table: { field, label, columns: [[fieldname, label, format]] }
+ */
+const STATUS = (d) => (d.docstatus === 2 ? "Cancelled" : d.docstatus === 0 && !d.status ? "Draft" : d.status)
+
+export const records = {
+	"leave-applications": {
+		doctype: "Leave Application", label: "Leave applications", icon: "calendar",
+		fields: ["name", "employee_name", "leave_type", "from_date", "to_date", "total_leave_days", "status", "docstatus", "modified"],
+		search: ["employee_name", "leave_type"],
+		title: (d) => d.employee_name,
+		subtitle: (d) => `${d.leave_type} · ${d.name}`,
+		status: (d) => (d.docstatus === 0 ? "Open" : STATUS(d)),
+		columns: [
+			{ key: "leave_type", label: "Type" },
+			{ key: "from_date", label: "From", format: "date" },
+			{ key: "to_date", label: "To", format: "date" },
+			{ key: "total_leave_days", label: "Days", format: "days" },
+		],
+		filters: [
+			{ label: "Open", filters: { docstatus: 0, status: "Open" } },
+			{ label: "Approved", filters: { docstatus: 1, status: "Approved" } },
+			{ label: "Rejected", filters: { status: "Rejected" } },
+			{ label: "All", filters: {} },
+		],
+		sections: [
+			{ label: "Request", fields: [["employee_name", "Employee"], ["department", "Department"], ["leave_type", "Leave type"],
+				["from_date", "From", "date"], ["to_date", "To", "date"], ["half_day", "Half day", "check"],
+				["total_leave_days", "Total days", "days"], ["leave_balance", "Balance before", "days"], ["description", "Reason", "text"]] },
+			{ label: "Approval", fields: [["leave_approver", "Leave approver"], ["status", "Status"], ["posting_date", "Applied on", "date"]] },
+		],
+	},
+	"leave-allocations": {
+		doctype: "Leave Allocation", label: "Leave allocations", icon: "plus-square",
+		fields: ["name", "employee_name", "leave_type", "from_date", "to_date", "total_leaves_allocated", "docstatus", "modified"],
+		search: ["employee_name", "leave_type"],
+		title: (d) => d.employee_name,
+		subtitle: (d) => `${d.leave_type} · ${d.name}`,
+		status: (d) => STATUS({ ...d, status: d.docstatus === 1 ? "Submitted" : "" }),
+		columns: [
+			{ key: "leave_type", label: "Type" },
+			{ key: "from_date", label: "From", format: "date" },
+			{ key: "to_date", label: "To", format: "date" },
+			{ key: "total_leaves_allocated", label: "Days", format: "days" },
+		],
+		filters: [{ label: "Submitted", filters: { docstatus: 1 } }, { label: "Draft", filters: { docstatus: 0 } }, { label: "All", filters: {} }],
+		sections: [
+			{ label: "Allocation", fields: [["employee_name", "Employee"], ["leave_type", "Leave type"], ["from_date", "From", "date"],
+				["to_date", "To", "date"], ["new_leaves_allocated", "New days", "days"], ["unused_leaves", "Carried forward", "days"],
+				["total_leaves_allocated", "Total", "days"], ["leave_policy_assignment", "From assignment"]] },
+		],
+	},
+	"expense-claims": {
+		doctype: "Expense Claim", label: "Expense claims", icon: "credit-card",
+		fields: ["name", "employee_name", "posting_date", "total_claimed_amount", "total_sanctioned_amount", "currency", "status",
+			"approval_status", "docstatus", "modified"],
+		search: ["employee_name"],
+		title: (d) => d.employee_name,
+		subtitle: (d) => `${d.name} · ${d.approval_status}`,
+		status: (d) => (d.docstatus === 0 ? "Draft" : STATUS(d)),
+		columns: [
+			{ key: "posting_date", label: "Date", format: "date" },
+			{ key: "total_claimed_amount", label: "Claimed", format: "money" },
+			{ key: "total_sanctioned_amount", label: "Sanctioned", format: "money" },
+		],
+		filters: [
+			{ label: "Waiting", filters: { docstatus: 0, approval_status: "Draft" } },
+			{ label: "Unpaid", filters: { docstatus: 1, status: "Unpaid" } },
+			{ label: "Paid", filters: { status: "Paid" } },
+			{ label: "Rejected", filters: { approval_status: "Rejected" } },
+			{ label: "All", filters: {} },
+		],
+		sections: [
+			{ label: "Claim", fields: [["employee_name", "Employee"], ["department", "Department"], ["posting_date", "Date", "date"],
+				["expense_approver", "Expense approver"], ["approval_status", "Approval"], ["status", "Payment status"]] },
+			{ label: "Totals", fields: [["total_claimed_amount", "Claimed", "money"], ["total_sanctioned_amount", "Sanctioned", "money"],
+				["total_advance_amount", "Set against advance", "money"], ["total_amount_reimbursed", "Reimbursed", "money"],
+				["grand_total", "Grand total", "money"]] },
+		],
+		table: { field: "expenses", label: "Expenses", columns: [["expense_date", "Date", "date"], ["expense_type", "Type"],
+			["description", "Description", "text"], ["amount", "Claimed", "money"], ["sanctioned_amount", "Sanctioned", "money"]] },
+		attachments: true,
+	},
+	"attendance-requests": {
+		doctype: "Attendance Request", label: "Attendance requests", icon: "check-square",
+		fields: ["name", "employee_name", "from_date", "to_date", "reason", "docstatus", "modified"],
+		search: ["employee_name"],
+		title: (d) => d.employee_name,
+		subtitle: (d) => `${d.reason} · ${d.name}`,
+		status: (d) => ({ 0: "Open", 1: "Approved", 2: "Cancelled" })[d.docstatus],
+		columns: [
+			{ key: "reason", label: "Reason" },
+			{ key: "from_date", label: "From", format: "date" },
+			{ key: "to_date", label: "To", format: "date" },
+		],
+		filters: [{ label: "Open", filters: { docstatus: 0 } }, { label: "Approved", filters: { docstatus: 1 } }, { label: "All", filters: {} }],
+		sections: [
+			{ label: "Request", fields: [["employee_name", "Employee"], ["department", "Department"], ["reason", "Reason"],
+				["from_date", "From", "date"], ["to_date", "To", "date"], ["half_day", "Half day", "check"],
+				["include_holidays", "Includes holidays", "check"], ["explanation", "Explanation", "text"]] },
+		],
+	},
+	"salary-slips": {
+		doctype: "Salary Slip", label: "Salary slips", icon: "file-text", printable: true,
+		fields: ["name", "employee_name", "start_date", "end_date", "net_pay", "currency", "status", "docstatus", "modified"],
+		search: ["employee_name"],
+		title: (d) => d.employee_name,
+		subtitle: (d) => d.name,
+		status: (d) => (d.docstatus === 0 ? "Draft" : STATUS(d)),
+		columns: [
+			{ key: "start_date", label: "From", format: "date" },
+			{ key: "end_date", label: "To", format: "date" },
+			{ key: "net_pay", label: "Net pay", format: "money" },
+		],
+		filters: [{ label: "Submitted", filters: { docstatus: 1 } }, { label: "Draft", filters: { docstatus: 0 } }, { label: "All", filters: {} }],
+		sections: [
+			{ label: "Slip", fields: [["employee_name", "Employee"], ["start_date", "From", "date"], ["end_date", "To", "date"],
+				["salary_structure", "Structure"], ["payroll_entry", "Payroll entry"], ["total_working_days", "Working days", "days"],
+				["payment_days", "Payment days", "days"], ["leave_without_pay", "Unpaid leave", "days"]] },
+			{ label: "Pay", fields: [["gross_pay", "Gross", "money"], ["total_deduction", "Deductions", "money"], ["net_pay", "Net pay", "money"]] },
+		],
+		tables: [
+			{ field: "earnings", label: "Earnings", columns: [["salary_component", "Component"], ["amount", "Amount", "money"]] },
+			{ field: "deductions", label: "Deductions", columns: [["salary_component", "Component"], ["amount", "Amount", "money"]] },
+		],
+	},
+	promotions: {
+		doctype: "Employee Promotion", label: "Promotions", icon: "trending-up",
+		fields: ["name", "employee_name", "promotion_date", "docstatus", "modified"],
+		search: ["employee_name"],
+		title: (d) => d.employee_name,
+		subtitle: (d) => d.name,
+		status: (d) => ({ 0: "Draft", 1: "Submitted", 2: "Cancelled" })[d.docstatus],
+		columns: [{ key: "promotion_date", label: "Date", format: "date" }],
+		filters: [{ label: "All", filters: {} }, { label: "Draft", filters: { docstatus: 0 } }],
+		sections: [{ label: "Promotion", fields: [["employee_name", "Employee"], ["promotion_date", "Date", "date"],
+			["current_ctc", "Current CTC", "money"], ["revised_ctc", "Revised CTC", "money"]] }],
+		table: { field: "promotion_details", label: "What changes", columns: [["property", "Property"], ["current", "Was"], ["new", "Becomes"]] },
+		submitHint: "It can only be submitted on or after the promotion date.",
+	},
+	transfers: {
+		doctype: "Employee Transfer", label: "Transfers", icon: "shuffle",
+		fields: ["name", "employee_name", "transfer_date", "docstatus", "modified"],
+		search: ["employee_name"],
+		title: (d) => d.employee_name,
+		subtitle: (d) => d.name,
+		status: (d) => ({ 0: "Draft", 1: "Submitted", 2: "Cancelled" })[d.docstatus],
+		columns: [{ key: "transfer_date", label: "Date", format: "date" }],
+		filters: [{ label: "All", filters: {} }, { label: "Draft", filters: { docstatus: 0 } }],
+		sections: [{ label: "Transfer", fields: [["employee_name", "Employee"], ["transfer_date", "Date", "date"], ["new_company", "New company"]] }],
+		table: { field: "transfer_details", label: "What changes", columns: [["property", "Property"], ["current", "Was"], ["new", "Becomes"]] },
+	},
+	separations: {
+		doctype: "Employee Separation", label: "Exits", icon: "log-out",
+		fields: ["name", "employee_name", "boarding_begins_on", "boarding_status", "docstatus", "modified"],
+		search: ["employee_name"],
+		title: (d) => d.employee_name,
+		subtitle: (d) => d.name,
+		status: (d) => (d.docstatus === 0 ? "Draft" : d.boarding_status),
+		columns: [{ key: "boarding_begins_on", label: "Begins", format: "date" }],
+		filters: [{ label: "All", filters: {} }, { label: "Draft", filters: { docstatus: 0 } }],
+		sections: [{ label: "Exit", fields: [["employee_name", "Employee"], ["resignation_letter_date", "Resignation letter", "date"],
+			["boarding_begins_on", "Begins on", "date"], ["boarding_status", "Status"], ["project", "Checklist project"],
+			["exit_interview", "Exit interview", "text"]] }],
+		table: { field: "activities", label: "Checklist", columns: [["activity_name", "Activity"], ["user", "Owner"], ["begin_on", "Starts day"], ["duration", "Days"]] },
+	},
+}

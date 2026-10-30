@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ 'light' if desk_theme == 'automatic' else desk_theme }}">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+	<title>Apps</title>
+	<link rel="icon" href="{{ favicon }}" />
+	<link rel="apple-touch-icon" href="/assets/erp_overrides/manifest/apple-icon-180.png" />
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
+	{% if desk_theme == "automatic" %}
+	<script>
+		document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+	</script>
+	{% endif %}
+	<style>
+		/* Soft UI: pale blue-grey ground, white rounded tiles lifted by a light/dark shadow pair,
+		   one blue-to-indigo gradient for whatever is active */
+		:root {
+			--ground: #e6ecf2;
+			--tile: #f4f7fa;
+			--tile-hover: #ffffff;
+			--ink: #2d3340;
+			--ink-soft: #7b8494;
+			--shade-dark: rgba(163, 177, 198, 0.55);
+			--shade-light: rgba(255, 255, 255, 0.9);
+			--accent-from: #2b8ae6;
+			--accent-to: #3b2df5;
+			--accent: #3437ef;
+		}
+		[data-theme="dark"] {
+			--ground: #1c2028;
+			--tile: #232833;
+			--tile-hover: #282e3a;
+			--ink: #e8ebf1;
+			--ink-soft: #9aa3b2;
+			--shade-dark: rgba(0, 0, 0, 0.45);
+			--shade-light: rgba(255, 255, 255, 0.04);
+		}
+		* { box-sizing: border-box; }
+		body {
+			margin: 0; min-height: 100vh; color: var(--ink);
+			font-family: Montserrat, "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+			background: radial-gradient(1200px 600px at 15% -10%, rgba(43, 138, 230, 0.10), transparent 60%),
+			            radial-gradient(900px 500px at 110% 110%, rgba(59, 45, 245, 0.08), transparent 60%), var(--ground);
+			background-attachment: fixed;
+		}
+		.soft { background: var(--tile); border-radius: 28px;
+			box-shadow: 10px 10px 24px var(--shade-dark), -10px -10px 24px var(--shade-light); }
+		.bar { display: flex; align-items: center; justify-content: space-between; gap: 16px;
+			max-width: 1040px; margin: 0 auto; padding: calc(20px + env(safe-area-inset-top)) 20px 0; }
+		.brand { display: flex; align-items: center; }
+		.brand img { height: 30px; max-width: 160px; object-fit: contain; }
+
+		.user { position: relative; }
+		.user summary { list-style: none; cursor: pointer; }
+		.user summary::-webkit-details-marker { display: none; }
+		.avatar { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 16px; overflow: hidden;
+			font-weight: 600; font-size: 14px; color: var(--ink-soft); }
+		.avatar img { width: 100%; height: 100%; object-fit: cover; }
+		.menu { position: absolute; right: 0; top: calc(100% + 12px); min-width: 210px; padding: 8px; border-radius: 20px; z-index: 10; }
+		.menu .who { padding: 10px 12px 8px; font-weight: 600; font-size: 14px; }
+		.menu a { display: block; padding: 10px 12px; border-radius: 12px; color: var(--ink-soft); text-decoration: none; font-size: 14px; }
+		.menu a:hover { background: var(--tile-hover); color: var(--ink); }
+
+		main { max-width: 1040px; margin: 0 auto; padding: 36px 20px calc(48px + env(safe-area-inset-bottom)); }
+		.hello { padding: 30px 34px; margin-bottom: 36px; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+		.hello h1 { margin: 0 0 6px; font-size: 28px; font-weight: 600; letter-spacing: -0.01em; }
+		.hello p { margin: 0; color: var(--ink-soft); font-size: 15px; }
+		.today { text-align: right; }
+		.today .day { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+		.today .date { font-size: 22px; font-weight: 700; }
+
+		.apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 26px; }
+		.app { display: flex; flex-direction: column; gap: 18px; padding: 22px; min-height: 168px; text-decoration: none; color: var(--ink);
+			transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease; outline: none; }
+		.app:hover, .app:focus-visible { background: var(--tile-hover); transform: translateY(-3px);
+			box-shadow: 14px 14px 30px var(--shade-dark), -10px -10px 24px var(--shade-light); }
+		.app:focus-visible { box-shadow: 0 0 0 3px rgba(52, 55, 239, 0.45), 14px 14px 30px var(--shade-dark); }
+		.app:active { transform: translateY(0);
+			box-shadow: inset 6px 6px 14px var(--shade-dark), inset -6px -6px 14px var(--shade-light); }
+		.badge { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 18px; color: #fff;
+			background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
+			box-shadow: 0 10px 20px -8px rgba(59, 45, 245, 0.6); }
+		.badge svg { width: 26px; height: 26px; }
+		.badge.plain { background: var(--tile-hover); box-shadow: 4px 4px 10px var(--shade-dark), -4px -4px 10px var(--shade-light); }
+		.badge img { width: 30px; height: 30px; object-fit: contain; }
+		.app .title { font-weight: 600; font-size: 17px; }
+		.app .hint { margin-top: 4px; font-size: 13px; line-height: 1.4; color: var(--ink-soft); }
+		.go { margin-left: auto; color: var(--ink-soft); transition: color 0.18s ease, transform 0.18s ease; }
+		.app:hover .go { color: var(--accent); transform: translateX(3px); }
+		.top { display: flex; align-items: center; }
+		.empty { padding: 28px; text-align: center; color: var(--ink-soft); }
+
+		@media (max-width: 600px) {
+			main { padding-top: 24px; }
+			.hello { padding: 22px 22px; margin-bottom: 26px; border-radius: 24px; }
+			.hello h1 { font-size: 22px; }
+			.today { display: none; }
+			.apps { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+			.app { padding: 16px; min-height: 0; gap: 14px; border-radius: 22px; }
+			.badge { width: 46px; height: 46px; border-radius: 15px; }
+			.badge svg { width: 22px; height: 22px; }
+			.app .title { font-size: 15px; }
+			.app .hint, .go { display: none; }
+		}
+		@media (prefers-reduced-motion: reduce) { .app, .go { transition: none; } }
+	</style>
+</head>
+<body>
+	<header class="bar">
+		<a class="brand" href="/launcher"><img src="{{ brand_logo }}" alt="{{ _('App Logo') }}" /></a>
+		<details class="user">
+			<summary aria-label="{{ _('Account') }}">
+				<span class="avatar soft" title="{{ full_name }}">
+					{% if user_image %}<img src="{{ user_image }}" alt="" />{% else %}{{ initials }}{% endif %}
+				</span>
+			</summary>
+			<div class="menu soft">
+				<div class="who">{{ full_name }}</div>
+				<a href="/desk">{{ _("Open desk") }}</a>
+				<a href="/login" id="logout">{{ _("Log out") }}</a>
+			</div>
+		</details>
+	</header>
+
+	<main>
+		<section class="hello soft">
+			<div>
+				<h1>{{ _("Hello, {0}").format(full_name.split(" ")[0]) if full_name else _("Hello") }}</h1>
+				<p>{{ _("Pick where to work.") }}</p>
+			</div>
+			<div class="today" aria-hidden="true">
+				<div class="day" id="today-day"></div>
+				<div class="date" id="today-date"></div>
+			</div>
+		</section>
+
+		{% if tiles %}
+		<nav class="apps" aria-label="{{ _('Apps') }}">
+			{% for t in tiles %}
+			<a class="app soft" href="{{ t.route }}">
+				<div class="top">
+					{% if t.logo %}
+					<div class="badge plain"><img src="{{ t.logo }}" alt="" /></div>
+					{% else %}
+					<div class="badge" aria-hidden="true">
+						{% if t.icon == "sales" %}
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+						{% elif t.icon == "hr" %}
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+						{% elif t.icon == "employee" %}
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+						{% elif t.icon == "accounts" %}
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+						{% elif t.icon == "calendar" %}
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+						{% elif t.icon == "reviews" %}
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+						{% elif t.icon == "admin" %}
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+						{% else %}
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+						{% endif %}
+					</div>
+					{% endif %}
+					<svg class="go" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+				</div>
+				<div>
+					<div class="title">{{ t.title }}</div>
+					<div class="hint">{{ t.hint }}</div>
+				</div>
+			</a>
+			{% endfor %}
+		</nav>
+		{% else %}
+		<p class="empty soft">{{ _("You don't have access to any app yet. Ask a System Manager.") }}</p>
+		{% endif %}
+	</main>
+
+	<script>
+		const now = new Date()
+		document.getElementById("today-day").textContent = now.toLocaleDateString(undefined, { weekday: "long" })
+		document.getElementById("today-date").textContent = now.toLocaleDateString(undefined, { day: "numeric", month: "long" })
+		document.getElementById("logout").addEventListener("click", async (e) => {
+			e.preventDefault()
+			await fetch("/api/method/logout", { method: "POST", headers: { "X-Frappe-CSRF-Token": "{{ csrf_token }}" } })
+			window.location.href = "/login?redirect-to=/launcher"
+		})
+		// close the account menu on a click elsewhere
+		document.addEventListener("click", (e) => {
+			const menu = document.querySelector(".user")
+			if (menu.open && !menu.contains(e.target)) menu.open = false
+		})
+	</script>
+</body>
+</html>

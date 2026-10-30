@@ -1,0 +1,251 @@
+{
+ "actions": [],
+ "creation": "2026-10-21 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "employee",
+  "employee_name",
+  "department",
+  "employee_user",
+  "manager",
+  "manager_name",
+  "manager_user",
+  "column_break_1",
+  "schedule",
+  "review_form",
+  "period_start",
+  "period_end",
+  "opens_on",
+  "due_on",
+  "status",
+  "overdue",
+  "section_answers",
+  "answers",
+  "manager_comments",
+  "section_done",
+  "self_done_on",
+  "completed_on",
+  "appraisal",
+  "feedback",
+  "rollup_note"
+ ],
+ "fields": [
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "label": "Employee",
+   "options": "Employee",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "label": "Employee name",
+   "fetch_from": "employee.employee_name",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "label": "Department",
+   "options": "Department",
+   "fetch_from": "employee.department",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "employee_user",
+   "fieldtype": "Data",
+   "label": "Employee user",
+   "read_only": 1,
+   "options": "Email"
+  },
+  {
+   "fieldname": "manager",
+   "fieldtype": "Link",
+   "label": "Manager",
+   "options": "Employee",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "manager_name",
+   "fieldtype": "Data",
+   "label": "Manager name",
+   "fetch_from": "manager.employee_name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "manager_user",
+   "fieldtype": "Data",
+   "label": "Manager user",
+   "read_only": 1,
+   "options": "Email"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "schedule",
+   "fieldtype": "Link",
+   "label": "Schedule",
+   "options": "Review Schedule",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "review_form",
+   "fieldtype": "Link",
+   "label": "Review form",
+   "options": "Review Form",
+   "read_only": 1
+  },
+  {
+   "fieldname": "period_start",
+   "fieldtype": "Date",
+   "label": "Period from",
+   "reqd": 1
+  },
+  {
+   "fieldname": "period_end",
+   "fieldtype": "Date",
+   "label": "Period to",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "opens_on",
+   "fieldtype": "Date",
+   "label": "Opens on"
+  },
+  {
+   "fieldname": "due_on",
+   "fieldtype": "Date",
+   "label": "Due on",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Open\nSelf done\nCompleted",
+   "default": "Open",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "overdue",
+   "fieldtype": "Check",
+   "label": "Overdue",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "section_answers",
+   "fieldtype": "Section Break",
+   "label": "Answers"
+  },
+  {
+   "fieldname": "answers",
+   "fieldtype": "Table",
+   "label": "Answers",
+   "options": "Review Answer"
+  },
+  {
+   "fieldname": "manager_comments",
+   "fieldtype": "Small Text",
+   "label": "Manager's comments"
+  },
+  {
+   "fieldname": "section_done",
+   "fieldtype": "Section Break",
+   "label": "Completion"
+  },
+  {
+   "fieldname": "self_done_on",
+   "fieldtype": "Datetime",
+   "label": "Employee done on",
+   "read_only": 1
+  },
+  {
+   "fieldname": "completed_on",
+   "fieldtype": "Datetime",
+   "label": "Completed on",
+   "read_only": 1
+  },
+  {
+   "fieldname": "appraisal",
+   "fieldtype": "Link",
+   "label": "Appraisal",
+   "options": "Appraisal",
+   "read_only": 1
+  },
+  {
+   "fieldname": "feedback",
+   "fieldtype": "Link",
+   "label": "Appraisal feedback",
+   "options": "Employee Performance Feedback",
+   "read_only": 1
+  },
+  {
+   "fieldname": "rollup_note",
+   "fieldtype": "Small Text",
+   "label": "Appraisal note",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-21 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Erp Overrides",
+ "name": "Review",
+ "owner": "Administrator",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "permissions": [
+  {
+   "role": "HR Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  },
+  {
+   "role": "HR User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  },
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  }
+ ],
+ "autoname": "REV-.YYYY.-.#####",
+ "naming_rule": "Expression (old style)",
+ "title_field": "employee_name",
+ "track_changes": 1
+}

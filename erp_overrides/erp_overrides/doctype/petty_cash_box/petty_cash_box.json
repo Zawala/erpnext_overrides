@@ -1,0 +1,57 @@
+{
+ "actions": [],
+ "creation": "2026-10-13 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "account",
+  "custodian",
+  "float_amount",
+  "approval_limit"
+ ],
+ "fields": [
+  {
+   "fieldname": "account",
+   "fieldtype": "Link",
+   "options": "Account",
+   "label": "Cash account",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "A Cash-type ledger account, e.g. 1200 Petty Cash"
+  },
+  {
+   "fieldname": "custodian",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "Custodian",
+   "in_list_view": 1,
+   "description": "Keeps the cash and records vouchers for this box, even without an accounts role"
+  },
+  {
+   "fieldname": "float_amount",
+   "fieldtype": "Currency",
+   "label": "Float",
+   "in_list_view": 1,
+   "description": "The amount the box is topped back up to"
+  },
+  {
+   "fieldname": "approval_limit",
+   "fieldtype": "Currency",
+   "label": "Approval above",
+   "in_list_view": 1,
+   "description": "Vouchers above this wait for an Accounts Manager. 0 = never"
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-13 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Erp Overrides",
+ "name": "Petty Cash Box",
+ "owner": "Administrator",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "istable": 1,
+ "permissions": []
+}

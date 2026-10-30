@@ -1,0 +1,34 @@
+{
+	"name": "erp-apps-ui",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"dev:hr": "vite -c vite.hr.config.js",
+		"dev:accounts": "vite -c vite.accounts.config.js",
+		"dev:sysadmin": "vite -c vite.sysadmin.config.js",
+		"serve": "vite preview",
+		"build": "yarn build:sales && yarn build:hr && yarn build:accounts && yarn build:sysadmin",
+		"build:sales": "vite build --base=/assets/erp_overrides/frontend/ && yarn copy-html-entry",
+		"build:hr": "vite build -c vite.hr.config.js --base=/assets/erp_overrides/hr-admin/ && cp ../erp_overrides/public/hr-admin/hr.html ../erp_overrides/www/hrms_admin.html",
+		"build:accounts": "vite build -c vite.accounts.config.js --base=/assets/erp_overrides/accounts/ && cp ../erp_overrides/public/accounts/accounts.html ../erp_overrides/www/accounts.html",
+		"build:sysadmin": "vite build -c vite.sysadmin.config.js --base=/assets/erp_overrides/sys-admin/ && cp ../erp_overrides/public/sys-admin/sysadmin.html ../erp_overrides/www/sys_admin.html",
+		"copy-html-entry": "cp ../erp_overrides/public/frontend/index.html ../erp_overrides/www/sales.html"
+	},
+	"dependencies": {
+		"@vitejs/plugin-vue": "^4.4.0",
+		"autoprefixer": "^10.4.19",
+		"dayjs": "^1.11.11",
+		"feather-icons": "^4.29.1",
+		"frappe-ui": "0.1.105",
+		"postcss": "^8.4.5",
+		"tailwindcss": "^3.4.3",
+		"vite": "^5.4.10",
+		"vite-plugin-pwa": "^0.20.5",
+		"vue": "^3.5.12",
+		"vue-router": "^4.3.2",
+		"workbox-core": "^7.0.0",
+		"workbox-precaching": "^7.0.0"
+	}
+}
