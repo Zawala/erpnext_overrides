@@ -34,7 +34,7 @@ The System Manager's front door: users and roles, why someone can't open somethi
 
 Everyone lands on `/launcher` after logging in: one tile per app the user's roles open (Sales, HR, Accounts, Admin), **My HR** (Frappe HR's own employee app at `/hrms`) and **Who's off** (the company leave calendar, `/hrms-admin/calendar`) for anyone linked to an Employee who hasn't left, plus **Desk** for System Users, laid out like desk's own desktop. A tile only shows when that app would let the user in, so nobody gets a tile that ends in *Not Permitted*. Every app's sidebar links back with **All apps**.
 
-The page is a self-contained soft UI: white rounded tiles on a pale blue-grey ground, one blue-to-indigo gradient for icons and anything active, Montserrat headings, and a dark variant that follows the user's desk theme. The four apps share the accent (`frontend/src/main.css`): the current sidebar item is a gradient pill, and selected chips, steps and primary buttons take the same gradient. With no logo set in Navbar or Website Settings, the app's own icon stands in for Frappe's.
+The page is a self-contained soft UI: white rounded tiles on a pale blue-grey ground, one solid blue for icons and anything active, Montserrat headings, and a dark variant that follows the user's desk theme. The four apps share the accent (`frontend/src/main.css`): the current sidebar item is a blue pill, and selected chips, steps and primary buttons take the same blue. With no logo set in Navbar or Website Settings, the app's own icon stands in for Frappe's.
 
 How it's wired (`erp_overrides/www/launcher.py`, `hooks.py`):
 

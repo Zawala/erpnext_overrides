@@ -16,7 +16,7 @@
 	{% endif %}
 	<style>
 		/* Soft UI: pale blue-grey ground, white rounded tiles lifted by a light/dark shadow pair,
-		   one blue-to-indigo gradient for whatever is active */
+		   one solid blue for icons and whatever is active */
 		:root {
 			--ground: #e6ecf2;
 			--tile: #f4f7fa;
@@ -25,8 +25,6 @@
 			--ink-soft: #7b8494;
 			--shade-dark: rgba(163, 177, 198, 0.55);
 			--shade-light: rgba(255, 255, 255, 0.9);
-			--accent-from: #2b8ae6;
-			--accent-to: #3b2df5;
 			--accent: #3437ef;
 		}
 		[data-theme="dark"] {
@@ -42,9 +40,7 @@
 		body {
 			margin: 0; min-height: 100vh; color: var(--ink);
 			font-family: Montserrat, "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-			background: radial-gradient(1200px 600px at 15% -10%, rgba(43, 138, 230, 0.10), transparent 60%),
-			            radial-gradient(900px 500px at 110% 110%, rgba(59, 45, 245, 0.08), transparent 60%), var(--ground);
-			background-attachment: fixed;
+			background: var(--ground);
 		}
 		.soft { background: var(--tile); border-radius: 28px;
 			box-shadow: 10px 10px 24px var(--shade-dark), -10px -10px 24px var(--shade-light); }
@@ -81,7 +77,7 @@
 		.app:active { transform: translateY(0);
 			box-shadow: inset 6px 6px 14px var(--shade-dark), inset -6px -6px 14px var(--shade-light); }
 		.badge { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 18px; color: #fff;
-			background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
+			background: var(--accent);
 			box-shadow: 0 10px 20px -8px rgba(59, 45, 245, 0.6); }
 		.badge svg { width: 26px; height: 26px; }
 		.badge.plain { background: var(--tile-hover); box-shadow: 4px 4px 10px var(--shade-dark), -4px -4px 10px var(--shade-light); }
