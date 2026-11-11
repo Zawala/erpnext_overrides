@@ -13,6 +13,7 @@
   "status",
   "attempts",
   "last_attempt",
+  "next_attempt",
   "cb1",
   "icv",
   "uuid",
@@ -74,6 +75,13 @@
    "fieldtype": "Datetime",
    "label": "Last attempt",
    "read_only": 1
+  },
+  {
+   "fieldname": "next_attempt",
+   "fieldtype": "Datetime",
+   "label": "Next automatic attempt",
+   "read_only": 1,
+   "description": "Set after a failed send; the sweeper (every 5 minutes) retries then. Empty after a Failed send means it gave up: use Send to ZATCA again."
   },
   {
    "fieldname": "cb1",
@@ -159,7 +167,7 @@
  ],
  "in_create": 1,
  "links": [],
- "modified": "2026-11-11 10:00:00.000000",
+ "modified": "2026-11-11 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Erp Overrides",
  "name": "ZATCA Submission",

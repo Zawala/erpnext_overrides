@@ -255,7 +255,15 @@ doc_events = {
 # }
 
 scheduler_events = {
+	# ZATCA: flag simplified invoices close to the 24-hour reporting limit
+	"hourly": [
+		"erp_overrides.zatca.submit.check_overdue",
+	],
 	"cron": {
+		# ZATCA outbox (erp_overrides.zatca.submit): send what the queued job missed, retry failures
+		"*/5 * * * *": [
+			"erp_overrides.zatca.submit.sweep",
+		],
 		# Tender feeds (stubs in erp_overrides.scrapers; see docs/sadc-data-feeds.md)
 		"0 0,8,16 * * *": [
 			"erp_overrides.scrapers.enqueue_get_tenders",

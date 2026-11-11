@@ -23,9 +23,29 @@ Results from live calls to `https://gw-fatoora.zatca.gov.sa/e-invoicing/develope
 | Tampered invoice (one item name changed after signing) | Rejected: `invalid-invoice-hash` / `invoiceHash_QRCODE_INVALID` |
 | CSID renewal (`PATCH /production/csids`, new key and CSR, OTP `123345`) | New production CSID issued (HTTP 200) |
 
-**Not run yet:** the Frappe side, meaning the doctypes, hooks, onboarding button, retry and Desk
-script. That code is written and compiles, but it hasn't been migrated onto a site and run (see
-[What's left](#whats-left)).
+### Through ERPNext (Frappe 16.51.1, on a local site with the demo data below)
+
+| Step | Result |
+|---|---|
+| `bench migrate` | Clean: both doctypes, the custom fields and the patch applied |
+| Onboarding from ZATCA Settings (`onboarding.run`) | 6 compliance checks `PASS`, production CSID stored, valid until 2029-01-09 |
+| B2B Sales Invoice (2 lines, 15% VAT, 4,139.97 SAR) | **Cleared**; ZATCA's stamped XML and QR stored |
+| B2C Sales Invoice (401.35 SAR) and its credit note | **Reported** both, with our QR (tags 1–9) |
+| Invoice chain | ICV 1, 2, 3…; each PIH equals the previous hash; the first is the spec's seed |
+| B2B customer with a malformed VAT number | **Rejected**: `BR-KSA-44: … must contain 15 digits. The first digit and the last digit is "3"` |
+| Fix the customer, click *Send to ZATCA again* | Re-signed as a new document (ICV 5, PIH = the rejected hash) and **Cleared**; the old one is *Superseded* |
+| Next invoice after the rejection | Reported, still chained |
+| B2B customer without an address | Submit blocked before signing, with the missing fields listed; ICV not used up |
+| Cancel a cleared invoice | Blocked: "Issue a credit note instead" |
+| Renew CSID (`onboarding.renew`) | New CSID; chain kept; the next invoice is reported |
+| Background job (`bench worker`) | Invoice *Pending* after submit, *Cleared* once the worker ran |
+| Two senders at once (separate processes) | The second `send` returns *Busy* while the first holds the row; ZATCA is called once |
+| Sweeper, live | A submission that failed and was due a retry was **Reported** on attempt 2; a *Pending* one its job never sent was picked up |
+| Outbox integration tests (ZATCA mocked) | 7/7 pass: missed job, backoff then success, network error, giving up after 10 attempts, no resend once settled, lock skip, overdue flag |
+| Zimbabwe demo company | No ZATCA activity |
+
+**Not checked in a browser yet:** the Desk buttons, status indicator and QR display
+(`zatca_sales_invoice.js`, the ZATCA Settings buttons).
 
 ## How it works
 
@@ -44,6 +64,17 @@ Sales Invoice submit
 - **Retry.** A *Failed* send (network, auth, 5xx) resends the same signed XML. A *Rejected*
   document is final: once the cause is fixed, retry signs a **new** document with a new ICV and UUID.
   The rejected one stays in the chain, because ZATCA records rejected hashes too, and is marked *Superseded*.
+- **Outbox.** The *ZATCA Submission* row is written in the same transaction as the invoice, so every
+  submitted invoice has one and nothing is lost if Redis or a worker is down. The queued job is only the
+  fast path. A **sweeper** (`submit.sweep`, every 5 minutes) sends:
+  - *Pending* submissions older than 3 minutes, which their job never sent, and
+  - *Failed* ones that are due a retry, on a backoff of 1, 5, 15 and 60 minutes, then hourly, up to 10 attempts.
+
+  After that the submission waits for a person (*Send to ZATCA again*). `send()` takes a row lock
+  (`FOR UPDATE SKIP LOCKED`), so the job, the sweeper and the button never send the same document at once,
+  and a settled submission is never sent again. An **hourly check** (`submit.check_overdue`) writes an
+  Error Log entry listing simplified invoices still not reported 20 hours after issue, because ZATCA's limit
+  is 24 hours. ZATCA Settings shows the outbox: how many are pending, failed, given up, rejected and overdue.
 - **Cancelling** an invoice ZATCA has accepted is blocked; issue a credit note instead.
 - **Renewal.** *Renew CSID* in ZATCA Settings makes a new key and CSR and calls `PATCH /production/csids`,
   authenticated with the current production CSID. If ZATCA answers 428 `NOT_COMPLIANT`, it hands back a
@@ -90,16 +121,19 @@ covered by unit tests built from the API reference's example bodies, not by live
 | File | Purpose |
 |---|---|
 | `erp_overrides/zatca/mapping.py` | Sales Invoice → dict; `check()` lists what would make ZATCA reject it, in plain words |
-| `erp_overrides/zatca/submit.py` | Doc events, the chain, `send`, whitelisted `retry` and `qr_svg` |
+| `erp_overrides/zatca/submit.py` | Doc events, the chain, `send` (row-locked), whitelisted `retry`, `qr_svg` and `backlog`; the outbox `sweep` and `check_overdue` |
+| `erp_overrides/tests/test_zatca.py` | Outbox integration tests with a fake ZATCA client: `bench --site <site> run-tests --module erp_overrides.tests.test_zatca` |
+| `erp_overrides/zatca/demo.py` | Fictional Saudi demo: `seed` (company, VAT 15%, customers, settings) and `invoices` (B2B, B2C, credit note) |
 | `erp_overrides/zatca/onboarding.py` | Whitelisted `run` (CSR → compliance CSID → 6 compliance checks → production CSID, new chain) and `renew` (new CSR → renewed CSID, chain kept) |
 | `erp_overrides/erp_overrides/doctype/zatca_settings/` | Single doctype: company, environment, seller details, EGS serial, OTP, chain state, certificate expiry, and encrypted credentials (Password fields, stored in the site database and never in git). Has **Onboard** and **Renew CSID** buttons |
-| `erp_overrides/erp_overrides/doctype/zatca_submission/` | One row per signed document: ICV, UUID, hash, PIH, status, ZATCA's errors and warnings, response, signed and cleared XML |
+| `erp_overrides/erp_overrides/doctype/zatca_submission/` | One row per signed document (the outbox): ICV, UUID, hash, PIH, status, attempts, next automatic attempt, ZATCA's errors and warnings, response, signed and cleared XML |
 | `erp_overrides/patches/v1_0/zatca_2026_11.py` | Custom fields. On Sales Invoice: `zatca_status`, `zatca_submission`, `zatca_uuid`, `zatca_qr`. On Address: `zatca_building_number`, `zatca_district`, which ZATCA requires on B2B buyer addresses |
 | `erp_overrides/public/js/zatca_sales_invoice.js` | Status indicator, QR code, "Send to ZATCA again" and "ZATCA response" buttons |
 
 ### Changed
 
-- `erp_overrides/hooks.py`: Sales Invoice `before_submit`, `on_submit` and `before_cancel`, plus `doctype_js`.
+- `erp_overrides/hooks.py`: Sales Invoice `before_submit`, `on_submit` and `before_cancel`, `doctype_js`, and
+  two scheduler entries (`sweep` every 5 minutes, `check_overdue` hourly; both do nothing while ZATCA is off).
   They do nothing unless ZATCA Settings is enabled for the invoice's company, so other companies, such as
   the Zimbabwe demo, are untouched.
 - `erp_overrides/patches.txt`: registers `zatca_2026_11`.
@@ -127,11 +161,17 @@ covered by unit tests built from the API reference's example bodies, not by live
 6. **Some errors are plain text.** A malformed CSR gets `Invalid Request` and a bad `Accept-Version` gets a
    sentence, not JSON; `Response.summary()` shows them as they are.
 
-## Setup (once the remaining steps are done)
+## Setup
 
 ```bash
 bench --site <site> migrate
+# optional fictional demo: a Saudi company, VAT 15%, a B2B and a B2C customer, settings filled in
+bench --site <site> execute erp_overrides.zatca.demo.seed
+bench --site <site> execute erp_overrides.zatca.onboarding.run
+bench --site <site> execute erp_overrides.zatca.demo.invoices   # B2B, B2C and a credit note
 ```
+
+Or by hand:
 
 1. Open **ZATCA Settings** and fill in:
    - Company, VAT number and CRN.
@@ -148,18 +188,16 @@ bench --site <site> migrate
 - One company and one EGS unit. SAR only. VAT categories S (standard) and Z (zero-rated, with one
   exemption code from settings); E and O aren't mapped.
 - No document-level allowances or charges in the XML: ERPNext's `net_rate` already includes them per line.
-- Simplified invoices are reported straight after submit. There's no offline queue or 24-hour batching.
+- Simplified invoices are reported straight after submit, with the outbox catching anything that didn't
+  go through. There's no deliberate batching within the 24 hours.
 - No bilingual (Arabic/English) print format yet. The QR code is shown on the form.
 
 ## What's left
 
-1. Migrate onto the showcase site and run the Frappe side end to end.
-2. `erp_overrides/zatca/demo.py`: a fictional Saudi company (SAR, 15% VAT), plus a B2B and a B2C customer.
-3. Live run: Onboard, then a B2B invoice, a B2C invoice and a credit note. Then the failure path: a customer
-   with a malformed VAT number gets a readable rejection, and fixing it then retrying works without breaking the chain.
-4. A GitHub Actions workflow running `erp_overrides/zatca/tests` (the tests exist and pass);
+1. Click through the Desk UI in a browser (buttons, indicator, QR) and fix anything that looks off.
+2. A GitHub Actions workflow running `erp_overrides/zatca/tests` (the tests exist and pass);
    Frappe integration tests for `send()` and the chain with the ZATCA API mocked.
-5. A section in the main README, an hours log, and a screen recording with a redacted sandbox log.
+3. A section in the main README, an hours log, and a screen recording with a redacted sandbox log.
 
 ## Running the tests
 

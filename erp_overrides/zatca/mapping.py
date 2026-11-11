@@ -16,8 +16,14 @@ from erp_overrides.zatca import ubl
 
 
 def kind(doc) -> str:
-	customer_type, tax_id = frappe.get_cached_value("Customer", doc.customer, ["customer_type", "tax_id"])
-	return "standard" if customer_type == "Company" and (doc.tax_id or tax_id) else "simplified"
+	customer_type = frappe.db.get_value("Customer", doc.customer, "customer_type")
+	return "standard" if customer_type == "Company" and _buyer_vat(doc) else "simplified"
+
+
+def _buyer_vat(doc):
+	"""The customer's VAT number as it is *now*, falling back to the copy on the invoice. A rejected
+	invoice was never cleared, so a corrected number on the Customer is what the re-signed one should carry."""
+	return frappe.db.get_value("Customer", doc.customer, "tax_id") or doc.tax_id
 
 
 def doc_type(doc) -> str:
@@ -43,7 +49,7 @@ def seller(settings) -> dict:
 
 def buyer(doc) -> dict | None:
 	name = doc.customer_name or doc.customer
-	tax_id = doc.tax_id or frappe.get_cached_value("Customer", doc.customer, "tax_id")
+	tax_id = _buyer_vat(doc)
 	address = frappe.db.get_value(
 		"Address",
 		doc.customer_address,

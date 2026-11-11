@@ -13,6 +13,12 @@ send:
 	submission Failed and `retry` resends the same signed XML. A rejection is final for that
 	document: once the cause is fixed, `retry` signs a new document with a new ICV and UUID,
 	and the rejected one stays in the chain (ZATCA records rejected hashes too).
+
+The outbox: the ZATCA Submission row is written in the same transaction as the invoice, so a
+submitted invoice always has one. The queued job is only the fast path; `sweep` (every 5
+minutes) sends anything the job never got to (Redis down, a worker killed) and retries Failed
+sends on a backoff schedule. `check_overdue` (hourly) flags simplified invoices that are close
+to ZATCA's 24-hour reporting deadline.
 """
 
 import base64
@@ -21,12 +27,22 @@ import uuid
 
 import frappe
 from frappe import _
-from frappe.utils import cint, now_datetime
+from frappe.utils import add_to_date, cint, now_datetime
 
 from erp_overrides.zatca import client, crypto, document, mapping
 
 SETTINGS = "ZATCA Settings"
 DONE = ("Cleared", "Reported", "Accepted with warnings")
+
+# Failed sends are retried by the sweeper after 1, 5, 15, 60 minutes, then hourly, up to
+# MAX_ATTEMPTS in all; after that a person has to look (the "Send to ZATCA again" button).
+BACKOFF_MINUTES = (1, 5, 15, 60)
+MAX_ATTEMPTS = 10
+# A Pending submission this old was never picked up by its queued job.
+STALE_PENDING_MINUTES = 3
+SWEEP_BATCH = 50
+# Simplified documents must be reported within 24 hours of issue; warn well before that.
+REPORTING_WARN_HOURS = 20
 
 
 def settings_for(company):
@@ -125,10 +141,38 @@ def _qr_from_xml(xml: bytes) -> str | None:
 	return node.text if node is not None else None
 
 
+def _lock(submission: str) -> bool:
+	"""Row-lock the submission for the rest of this transaction. False if another sender holds it."""
+	return bool(
+		frappe.db.sql(
+			"select name from `tabZATCA Submission` where name=%s for update skip locked", submission
+		)
+	)
+
+
+def _schedule_retry(sub):
+	"""After a Failed send: when the sweeper should try again, or never (then it's left for a person)."""
+	attempts = cint(sub.attempts)
+	sub.next_attempt = (
+		add_to_date(now_datetime(), minutes=BACKOFF_MINUTES[min(attempts, len(BACKOFF_MINUTES)) - 1])
+		if attempts < MAX_ATTEMPTS
+		else None
+	)
+
+
 def send(submission: str):
-	"""Send one ZATCA Submission and record ZATCA's answer on it and on its invoice."""
-	sub = frappe.get_doc("ZATCA Submission", submission)
+	"""Send one ZATCA Submission and record ZATCA's answer on it and on its invoice.
+
+	Safe to call from anywhere at any time (the queued job, the sweeper, the retry button):
+	the row lock makes sure only one of them talks to ZATCA about a submission at once, and a
+	submission that's already settled is left alone.
+	"""
+	frappe.db.commit()  # start a fresh transaction, so the lock is held only for this send
+	if not _lock(submission):
+		return "Busy"
+	sub = frappe.get_doc("ZATCA Submission", submission)  # read after locking: it may just have changed
 	if sub.status in DONE or sub.status in ("Rejected", "Superseded"):
+		frappe.db.commit()
 		return sub.status
 	settings = frappe.get_cached_doc(SETTINGS)
 	sub.attempts = cint(sub.attempts) + 1
@@ -176,6 +220,10 @@ def send(submission: str):
 				else r.summary()
 			)
 		sub.warnings = "\n".join(notes + warnings) or None
+	if sub.status == "Failed":
+		_schedule_retry(sub)
+	else:
+		sub.next_attempt = None
 	sub.save(ignore_permissions=True)
 	frappe.db.set_value(
 		"Sales Invoice", sub.sales_invoice, {"zatca_status": sub.status, **invoice_update}, update_modified=False
@@ -223,5 +271,76 @@ def qr_svg(invoice: str) -> str | None:
 	if not doc.get("zatca_qr"):
 		return None
 	buf = io.BytesIO()
-	pyqrcode.create(doc.zatca_qr, error="M").svg(buf, scale=3, omithw=False, xmldecl=False)
+	pyqrcode.create(doc.zatca_qr, error="M").svg(buf, scale=2, omithw=False, xmldecl=False)
 	return buf.getvalue().decode()
+
+
+# --- the outbox sweeper -------------------------------------------------------------------------
+
+
+def due() -> list[str]:
+	"""Submissions waiting to be sent: Pending ones their job never sent, and Failed ones due a retry."""
+	now = now_datetime()
+	return frappe.db.sql_list(
+		"""select name from `tabZATCA Submission`
+		where (status='Pending' and creation <= %(stale)s)
+		   or (status='Failed' and next_attempt is not null and next_attempt <= %(now)s)
+		order by icv limit %(limit)s""",
+		dict(stale=add_to_date(now, minutes=-STALE_PENDING_MINUTES), now=now, limit=SWEEP_BATCH),
+	)
+
+
+def sweep():
+	"""Scheduler, every 5 minutes: send whatever is due, oldest invoice first."""
+	if not frappe.db.get_single_value(SETTINGS, "enabled"):
+		return
+	for name in due():
+		try:
+			send(name)
+		except Exception:
+			frappe.db.rollback()
+			frappe.log_error(title=f"ZATCA sweep: {name}")
+
+
+def overdue() -> list[dict]:
+	"""Simplified (reported) documents not yet accepted, issued more than REPORTING_WARN_HOURS ago."""
+	return frappe.db.sql(
+		"""select sub.name, sub.sales_invoice, sub.status, si.posting_date, si.posting_time
+		from `tabZATCA Submission` sub join `tabSales Invoice` si on si.name = sub.sales_invoice
+		where sub.kind='Reporting' and sub.status in ('Pending', 'Failed', 'Rejected')
+		  and timestamp(si.posting_date, si.posting_time) <= %s
+		order by sub.icv""",
+		add_to_date(now_datetime(), hours=-REPORTING_WARN_HOURS),
+		as_dict=True,
+	)
+
+
+def check_overdue():
+	"""Scheduler, hourly: one Error Log entry listing simplified invoices near or past the 24-hour limit."""
+	if not frappe.db.get_single_value(SETTINGS, "enabled"):
+		return
+	late = overdue()
+	if late:
+		frappe.log_error(
+			title=f"ZATCA: {len(late)} simplified invoice(s) not reported within {REPORTING_WARN_HOURS} hours",
+			message="\n".join(f"{r.sales_invoice} ({r.status}), issued {r.posting_date} {r.posting_time}" for r in late),
+		)
+
+
+@frappe.whitelist()
+def backlog() -> dict:
+	"""Counts for the ZATCA Settings page."""
+	frappe.only_for(("System Manager", "Accounts Manager"))
+	counts = dict(
+		frappe.db.sql(
+			"""select status, count(*) from `tabZATCA Submission`
+			where status in ('Pending', 'Failed', 'Rejected') group by status"""
+		)
+	)
+	return dict(
+		pending=counts.get("Pending", 0),
+		failed=counts.get("Failed", 0),
+		rejected=counts.get("Rejected", 0),
+		gave_up=frappe.db.count("ZATCA Submission", {"status": "Failed", "next_attempt": ["is", "not set"]}),
+		overdue=len(overdue()),
+	)
