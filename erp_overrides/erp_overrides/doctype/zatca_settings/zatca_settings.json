@@ -1,0 +1,273 @@
+{
+ "actions": [],
+ "creation": "2026-11-11 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "issingle": 1,
+ "description": "ZATCA Phase 2 (Fatoora) e-invoicing: proof of concept, sandbox-tested only",
+ "field_order": [
+  "enabled",
+  "company",
+  "environment",
+  "seller_section",
+  "vat_number",
+  "crn",
+  "business_category",
+  "seller_cb",
+  "street",
+  "building_number",
+  "district",
+  "city",
+  "postal_code",
+  "tax_section",
+  "zero_rate_code",
+  "zero_rate_reason",
+  "egs_section",
+  "egs_serial",
+  "otp",
+  "onboarding_status",
+  "egs_cb",
+  "last_icv",
+  "last_hash",
+  "credentials_section",
+  "private_key",
+  "compliance_token",
+  "compliance_secret",
+  "compliance_request_id",
+  "production_token",
+  "production_secret",
+  "log_section",
+  "onboarding_log"
+ ],
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Send invoices to ZATCA",
+   "description": "Only Sales Invoices of the company below are signed and sent"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "mandatory_depends_on": "enabled"
+  },
+  {
+   "fieldname": "environment",
+   "fieldtype": "Select",
+   "label": "Environment",
+   "options": "developer-portal\nsimulation\ncore",
+   "default": "developer-portal",
+   "description": "developer-portal is ZATCA's public sandbox (OTP 123345). This POC is tested there only."
+  },
+  {
+   "fieldname": "seller_section",
+   "fieldtype": "Section Break",
+   "label": "Seller"
+  },
+  {
+   "fieldname": "vat_number",
+   "fieldtype": "Data",
+   "label": "VAT number",
+   "description": "15 digits, starts and ends with 3"
+  },
+  {
+   "fieldname": "crn",
+   "fieldtype": "Data",
+   "label": "Commercial registration (CRN)"
+  },
+  {
+   "fieldname": "business_category",
+   "fieldtype": "Data",
+   "label": "Business category",
+   "default": "Trading"
+  },
+  {
+   "fieldname": "seller_cb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "street",
+   "fieldtype": "Data",
+   "label": "Street"
+  },
+  {
+   "fieldname": "building_number",
+   "fieldtype": "Data",
+   "label": "Building number",
+   "description": "4 digits"
+  },
+  {
+   "fieldname": "district",
+   "fieldtype": "Data",
+   "label": "District"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "label": "City"
+  },
+  {
+   "fieldname": "postal_code",
+   "fieldtype": "Data",
+   "label": "Postal code",
+   "description": "5 digits"
+  },
+  {
+   "fieldname": "tax_section",
+   "fieldtype": "Section Break",
+   "label": "Zero-rated and exempt lines"
+  },
+  {
+   "fieldname": "zero_rate_code",
+   "fieldtype": "Data",
+   "label": "Exemption reason code",
+   "default": "VATEX-SA-35",
+   "description": "Used on 0% lines (category Z). See the XML Implementation Standard's VATEX codes."
+  },
+  {
+   "fieldname": "zero_rate_reason",
+   "fieldtype": "Data",
+   "label": "Exemption reason",
+   "default": "Medicines and medical equipment"
+  },
+  {
+   "fieldname": "egs_section",
+   "fieldtype": "Section Break",
+   "label": "EGS unit and onboarding"
+  },
+  {
+   "fieldname": "egs_serial",
+   "fieldtype": "Data",
+   "label": "EGS serial",
+   "default": "1-ERP Overrides|2-POC|3-0001",
+   "description": "1-solution name|2-model or version|3-serial number"
+  },
+  {
+   "fieldname": "otp",
+   "fieldtype": "Data",
+   "label": "OTP",
+   "default": "123345",
+   "description": "From the Fatoora portal. The developer-portal sandbox takes 123345."
+  },
+  {
+   "fieldname": "onboarding_status",
+   "fieldtype": "Data",
+   "label": "Onboarding",
+   "read_only": 1
+  },
+  {
+   "fieldname": "egs_cb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_icv",
+   "fieldtype": "Int",
+   "label": "Last invoice counter (ICV)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_hash",
+   "fieldtype": "Data",
+   "label": "Last invoice hash (PIH for the next one)",
+   "read_only": 1,
+   "length": 100
+  },
+  {
+   "fieldname": "credentials_section",
+   "fieldtype": "Section Break",
+   "label": "Credentials",
+   "collapsible": 1,
+   "description": "Stored encrypted in the site database, never in git."
+  },
+  {
+   "fieldname": "private_key",
+   "fieldtype": "Password",
+   "label": "Private key",
+   "read_only": 1,
+   "length": 1000
+  },
+  {
+   "fieldname": "compliance_token",
+   "fieldtype": "Password",
+   "label": "Compliance CSID",
+   "read_only": 1,
+   "length": 4000
+  },
+  {
+   "fieldname": "compliance_secret",
+   "fieldtype": "Password",
+   "label": "Compliance secret",
+   "read_only": 1,
+   "length": 200
+  },
+  {
+   "fieldname": "compliance_request_id",
+   "fieldtype": "Data",
+   "label": "Compliance request ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "production_token",
+   "fieldtype": "Password",
+   "label": "Production CSID",
+   "read_only": 1,
+   "length": 4000
+  },
+  {
+   "fieldname": "production_secret",
+   "fieldtype": "Password",
+   "label": "Production secret",
+   "read_only": 1,
+   "length": 200
+  },
+  {
+   "fieldname": "log_section",
+   "fieldtype": "Section Break",
+   "label": "Onboarding log",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "onboarding_log",
+   "fieldtype": "Long Text",
+   "label": "Log",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-11 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Erp Overrides",
+ "name": "ZATCA Settings",
+ "owner": "Administrator",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 0,
+   "export": 0,
+   "print": 0,
+   "email": 0,
+   "share": 0
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 0,
+   "export": 0,
+   "print": 0,
+   "email": 0,
+   "share": 0
+  }
+ ]
+}

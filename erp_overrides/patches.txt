@@ -16,3 +16,4 @@ erp_overrides.patches.v1_0.payslip_standard_2026_10
 erp_overrides.patches.v1_0.three_way_2026_10
 erp_overrides.patches.v1_0.supplier_terms_2026_10
 erp_overrides.patches.v1_0.reviews_setup_2026_10
+erp_overrides.patches.v1_0.zatca_2026_11

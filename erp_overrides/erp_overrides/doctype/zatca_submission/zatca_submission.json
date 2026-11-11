@@ -1,0 +1,194 @@
+{
+ "actions": [],
+ "creation": "2026-11-11 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "autoname": "format:ZATCA-{#####}",
+ "naming_rule": "Expression",
+ "description": "One signed document sent to ZATCA. A rejected invoice gets a new one when it's sent again; the old one stays in the chain.",
+ "field_order": [
+  "sales_invoice",
+  "company",
+  "kind",
+  "status",
+  "attempts",
+  "last_attempt",
+  "cb1",
+  "icv",
+  "uuid",
+  "invoice_hash",
+  "pih",
+  "messages_section",
+  "errors",
+  "warnings",
+  "response",
+  "xml_section",
+  "qr",
+  "signed_xml",
+  "cleared_xml"
+ ],
+ "fields": [
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Sent for",
+   "options": "Clearance\nReporting",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Pending\nCleared\nReported\nAccepted with warnings\nRejected\nFailed\nSuperseded",
+   "default": "Pending",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "attempts",
+   "fieldtype": "Int",
+   "label": "Attempts",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_attempt",
+   "fieldtype": "Datetime",
+   "label": "Last attempt",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "icv",
+   "fieldtype": "Int",
+   "label": "Invoice counter (ICV)",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "uuid",
+   "fieldtype": "Data",
+   "label": "UUID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "invoice_hash",
+   "fieldtype": "Data",
+   "label": "Invoice hash",
+   "read_only": 1,
+   "length": 100
+  },
+  {
+   "fieldname": "pih",
+   "fieldtype": "Data",
+   "label": "Previous invoice hash",
+   "read_only": 1,
+   "length": 100
+  },
+  {
+   "fieldname": "messages_section",
+   "fieldtype": "Section Break",
+   "label": "ZATCA's answer"
+  },
+  {
+   "fieldname": "errors",
+   "fieldtype": "Small Text",
+   "label": "Errors",
+   "read_only": 1
+  },
+  {
+   "fieldname": "warnings",
+   "fieldtype": "Small Text",
+   "label": "Warnings",
+   "read_only": 1
+  },
+  {
+   "fieldname": "response",
+   "fieldtype": "Code",
+   "label": "Response",
+   "options": "JSON",
+   "read_only": 1
+  },
+  {
+   "fieldname": "xml_section",
+   "fieldtype": "Section Break",
+   "label": "XML",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "qr",
+   "fieldtype": "Small Text",
+   "label": "QR (base64 TLV)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "signed_xml",
+   "fieldtype": "Code",
+   "label": "Signed XML",
+   "options": "XML",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cleared_xml",
+   "fieldtype": "Code",
+   "label": "Cleared XML (stamped by ZATCA)",
+   "options": "XML",
+   "read_only": 1
+  }
+ ],
+ "in_create": 1,
+ "links": [],
+ "modified": "2026-11-11 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Erp Overrides",
+ "name": "ZATCA Submission",
+ "owner": "Administrator",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "sales_invoice",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  },
+  {
+   "role": "Accounts User",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  }
+ ]
+}

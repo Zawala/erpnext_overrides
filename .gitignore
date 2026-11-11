@@ -69,3 +69,10 @@ erp_overrides/www/accounts.html
 # Admin PWA build output
 erp_overrides/public/sys-admin
 erp_overrides/www/sys_admin.html
+
+# ZATCA: link the official PDFs (docs/zatca/README.md), never commit keys or certificates
+docs/zatca/*.pdf
+*.pem
+*.csr
+*.key
+zatca_secrets*

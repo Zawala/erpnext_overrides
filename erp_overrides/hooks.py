@@ -50,6 +50,9 @@ get_website_user_home_page = "erp_overrides.www.launcher.home_page"
 # (the Quotation print guard's UI half is a Client Script, not an app asset —
 #  see scripts/install_print_guard.py)
 # doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {
+	"Sales Invoice": "public/js/zatca_sales_invoice.js",
+}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -194,6 +197,10 @@ doc_events = {
 	},
 	"Sales Invoice": {
 		"before_validate": "erp_overrides.stock_light.invoice_before_validate",
+		# ZATCA Phase 2 POC (erp_overrides.zatca); does nothing unless ZATCA Settings is on for the company
+		"before_submit": "erp_overrides.zatca.submit.before_submit",
+		"on_submit": "erp_overrides.zatca.submit.on_submit",
+		"before_cancel": "erp_overrides.zatca.submit.before_cancel",
 	},
 	"Purchase Receipt": {
 		"before_validate": "erp_overrides.stock_light.receipt_before_validate",
