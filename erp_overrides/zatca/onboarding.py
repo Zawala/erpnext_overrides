@@ -1,8 +1,16 @@
 # Copyright (c) 2026, Kelvin Zawala and contributors
 # For license information, please see license.txt
-"""Onboard the EGS unit (Technical Guideline §3): CSR → compliance CSID → compliance checks
-→ production CSID. Run from the ZATCA Settings "Onboard" button or
-`bench --site <site> execute erp_overrides.zatca.onboarding.run`.
+"""Onboard or renew the EGS unit's CSID (Technical Guideline §3; sandbox API reference).
+
+Onboarding: CSR → compliance CSID → compliance checks → production CSID. It starts a new
+invoice chain.
+Renewal: a new CSR → PATCH /production/csids, authenticated with the current production CSID.
+If ZATCA answers 428 NOT_COMPLIANT, it hands back a compliance CSID: run the compliance checks
+with it, then get the production CSID as in onboarding. The invoice chain carries on.
+
+Run from the ZATCA Settings buttons, or:
+	bench --site <site> execute erp_overrides.zatca.onboarding.run
+	bench --site <site> execute erp_overrides.zatca.onboarding.renew
 """
 
 import uuid
@@ -20,6 +28,25 @@ SAMPLE_BUYER = dict(
 	district="Al Rawdah", city="Jeddah", postal_code="23456",
 )
 DOCUMENTS = [(k, t) for k in ("standard", "simplified") for t in ("invoice", "credit", "debit")]
+REQUIRED = ("company", "vat_number", "crn", "street", "building_number", "district", "city", "postal_code", "otp")
+
+
+class _Log:
+	"""Collects the steps and writes them to ZATCA Settings, including when a step fails."""
+
+	def __init__(self, settings):
+		self.s, self.lines = settings, []
+
+	def __call__(self, line):
+		self.lines.append(f"{now_datetime():%H:%M:%S} {line}")
+
+	def fail(self, msg):
+		self(msg)
+		self.s.onboarding_status = "Failed"
+		self.s.onboarding_log = "\n".join(self.lines)
+		self.s.save(ignore_permissions=True)
+		frappe.db.commit()
+		frappe.throw(msg, title=_("ZATCA onboarding"))
 
 
 def _samples(settings, cert: str, key: str):
@@ -40,27 +67,16 @@ def _samples(settings, cert: str, key: str):
 		pih = signed["invoice_hash"]
 
 
-@frappe.whitelist()
-def run():
+def _settings_ready():
 	frappe.only_for(("System Manager", "Accounts Manager"))
 	s = frappe.get_doc(SETTINGS)
-	log = []
-
-	def say(line):
-		log.append(f"{now_datetime():%H:%M:%S} {line}")
-
-	def fail(msg):
-		say(msg)
-		s.onboarding_status = "Failed"
-		s.onboarding_log = "\n".join(log)
-		s.save(ignore_permissions=True)
-		frappe.db.commit()
-		frappe.throw(msg, title=_("ZATCA onboarding"))
-
-	for field in ("company", "vat_number", "crn", "street", "building_number", "district", "city", "postal_code", "otp"):
+	for field in REQUIRED:
 		if not s.get(field):
 			frappe.throw(_("Fill in {0} first.").format(s.meta.get_label(field)))
+	return s
 
+
+def _new_key_and_csr(s) -> tuple[str, str]:
 	key = crypto.new_private_key()
 	csr = crypto.make_csr(
 		key,
@@ -74,38 +90,81 @@ def run():
 		business_category=s.business_category or "Trading",
 		environment=s.environment,
 	)
-	say(f"Generated a secp256k1 key and CSR for {s.environment}")
+	return key, csr
 
-	api = client.Client(s.environment)
-	r = api.compliance_csid(csr, s.otp)
-	if not r.ok:
-		fail(f"Compliance CSID refused (HTTP {r.status_code}): {r.data}")
-	token, secret, request_id = r.data["binarySecurityToken"], r.data["secret"], r.data["requestID"]
-	say(f"Compliance CSID issued (request {request_id})")
 
+def _compliance_then_production(s, log, key: str, token: str, secret: str, request_id) -> client.Response:
+	"""Run the six compliance checks with a compliance CSID, then exchange it for a production CSID."""
 	cert = crypto.certificate_from_token(token)
 	checker = client.Client(s.environment, token, secret)
 	for kind, doc_type, doc_uuid, signed in _samples(s, cert, key):
 		r = checker.compliance_check(signed["xml"], signed["invoice_hash"], doc_uuid)
 		status = r.data.get("clearanceStatus") or r.data.get("reportingStatus")
-		say(f"Compliance check {kind} {doc_type}: HTTP {r.status_code} {status} {r.validation.get('status')}")
+		log(f"Compliance check {kind} {doc_type}: HTTP {r.status_code} {status} {r.validation.get('status')}")
 		for m in r.messages("errorMessages") + r.messages("warningMessages"):
-			say(f"    {m}")
+			log(f"    {m}")
 		if not r.ok:
-			fail(f"Compliance check failed for the {kind} {doc_type}; see the log.")
-
+			log.fail(f"Compliance check failed for the {kind} {doc_type}; see the log.")
 	r = checker.production_csid(request_id)
 	if not r.ok:
-		fail(f"Production CSID refused (HTTP {r.status_code}): {r.data}")
-	say(f"Production CSID issued (request {r.data.get('requestID')})")
+		log.fail(f"Production CSID refused: {r.summary()}")
+	return r
 
+
+def _store(s, log, key: str, production: client.Response, *, what: str, compliance=None):
+	cert = crypto.load_certificate(crypto.certificate_from_token(production.data["binarySecurityToken"]))
 	s.private_key = key
-	s.compliance_token, s.compliance_secret, s.compliance_request_id = token, secret, str(request_id)
-	s.production_token, s.production_secret = r.data["binarySecurityToken"], r.data["secret"]
-	# A new EGS unit starts a new chain.
-	s.last_icv, s.last_hash = 0, crypto.FIRST_PIH
-	s.onboarding_status = f"Onboarded on {now_datetime():%Y-%m-%d %H:%M} ({s.environment})"
-	s.onboarding_log = "\n".join(log)
+	if compliance:
+		s.compliance_token, s.compliance_secret, s.compliance_request_id = compliance
+	s.production_token, s.production_secret = production.data["binarySecurityToken"], production.data["secret"]
+	s.certificate_expiry = cert.not_valid_after_utc.date()
+	s.onboarding_status = f"{what} on {now_datetime():%Y-%m-%d %H:%M} ({s.environment})"
+	log(f"Production CSID issued (request {production.data.get('requestID')}), valid until {s.certificate_expiry}")
+	s.onboarding_log = "\n".join(log.lines)
 	s.save(ignore_permissions=True)
 	frappe.db.commit()
 	return s.onboarding_status
+
+
+@frappe.whitelist()
+def run():
+	"""Onboard a new EGS unit. Starts a new invoice chain."""
+	s = _settings_ready()
+	log = _Log(s)
+	key, csr = _new_key_and_csr(s)
+	log(f"Generated a secp256k1 key and CSR for {s.environment}")
+
+	r = client.Client(s.environment).compliance_csid(csr, s.otp)
+	if not r.ok:
+		log.fail(f"Compliance CSID refused: {r.summary()}")
+	token, secret, request_id = r.data["binarySecurityToken"], r.data["secret"], r.data["requestID"]
+	log(f"Compliance CSID issued (request {request_id})")
+
+	production = _compliance_then_production(s, log, key, token, secret, request_id)
+	# A new EGS unit starts a new chain.
+	s.last_icv, s.last_hash = 0, crypto.FIRST_PIH
+	return _store(s, log, key, production, what="Onboarded", compliance=(token, secret, str(request_id)))
+
+
+@frappe.whitelist()
+def renew():
+	"""Renew the production CSID with a new key. The invoice chain carries on."""
+	s = _settings_ready()
+	current_token = s.get_password("production_token", raise_exception=False)
+	if not current_token:
+		frappe.throw(_("There's no production CSID to renew yet. Click Onboard first."))
+	log = _Log(s)
+	key, csr = _new_key_and_csr(s)
+	log(f"Generated a new secp256k1 key and CSR for renewal ({s.environment})")
+
+	r = client.Client(s.environment, current_token, s.get_password("production_secret")).renew_csid(csr, s.otp)
+	if r.status_code == client.NOT_COMPLIANT:
+		# ZATCA wants the compliance steps again, with the compliance CSID it just issued
+		body = r.data.get("value") or r.data
+		token, secret, request_id = body["binarySecurityToken"], body["secret"], body["requestID"]
+		log(f"ZATCA answered NOT_COMPLIANT (428): running the compliance checks (request {request_id})")
+		production = _compliance_then_production(s, log, key, token, secret, request_id)
+		return _store(s, log, key, production, what="Renewed", compliance=(token, secret, str(request_id)))
+	if not r.ok:
+		log.fail(f"Renewal refused: {r.summary()}")
+	return _store(s, log, key, r, what="Renewed")

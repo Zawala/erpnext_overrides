@@ -26,6 +26,7 @@
   "egs_serial",
   "otp",
   "onboarding_status",
+  "certificate_expiry",
   "egs_cb",
   "last_icv",
   "last_hash",
@@ -158,6 +159,13 @@
    "read_only": 1
   },
   {
+   "fieldname": "certificate_expiry",
+   "fieldtype": "Date",
+   "label": "Production CSID valid until",
+   "read_only": 1,
+   "description": "Renew before this date (Renew CSID button)."
+  },
+  {
    "fieldname": "egs_cb",
    "fieldtype": "Column Break"
   },
@@ -236,7 +244,7 @@
   }
  ],
  "links": [],
- "modified": "2026-11-11 10:00:00.000000",
+ "modified": "2026-11-11 19:00:00.000000",
  "modified_by": "Administrator",
  "module": "Erp Overrides",
  "name": "ZATCA Settings",

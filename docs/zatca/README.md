@@ -21,6 +21,7 @@ Results from live calls to `https://gw-fatoora.zatca.gov.sa/e-invoicing/develope
 | Clearance: standard invoice, standard credit note | `CLEARED`, no warnings, stamped XML returned |
 | Reporting: simplified invoice, simplified credit note (incl. a 0% line with exemption code) | `REPORTED`, no warnings |
 | Tampered invoice (one item name changed after signing) | Rejected: `invalid-invoice-hash` / `invoiceHash_QRCODE_INVALID` |
+| CSID renewal (`PATCH /production/csids`, new key and CSR, OTP `123345`) | New production CSID issued (HTTP 200) |
 
 **Not run yet:** the Frappe side, meaning the doctypes, hooks, onboarding button, retry and Desk
 script. That code is written and compiles, but it hasn't been migrated onto a site and run (see
@@ -44,8 +45,32 @@ Sales Invoice submit
   document is final: once the cause is fixed, retry signs a **new** document with a new ICV and UUID.
   The rejected one stays in the chain, because ZATCA records rejected hashes too, and is marked *Superseded*.
 - **Cancelling** an invoice ZATCA has accepted is blocked; issue a credit note instead.
+- **Renewal.** *Renew CSID* in ZATCA Settings makes a new key and CSR and calls `PATCH /production/csids`,
+  authenticated with the current production CSID. If ZATCA answers 428 `NOT_COMPLIANT`, it hands back a
+  compliance CSID, so the six compliance checks run again before the new production CSID is fetched.
+  Unlike onboarding, renewal keeps the invoice chain. The certificate's expiry date is shown in the settings.
 - **Standard or simplified:** a customer of type Company with a VAT number (`tax_id`) gets a standard
   invoice; everyone else gets a simplified one. Returns become credit notes (381) and debit notes are 383.
+
+### How ZATCA's replies are recorded
+
+From ZATCA's sandbox API reference (Sandbox Release 2.1.0); handled in `submit.send()` and `client.py`:
+
+| HTTP | Meaning | Recorded as |
+|---|---|---|
+| 200 | Cleared / reported | *Cleared* / *Reported* |
+| 202 | Accepted with warnings | *Accepted with warnings*, warnings stored |
+| 208 | Clearance: this hash was already submitted (body still has `clearedInvoice`) | *Cleared*, with a note |
+| 303 | Clearance is switched off at ZATCA | Sent again through reporting; recorded from that reply, with a note |
+| 400 | Rejected (`errorMessages`, or a top-level `errors` list on the CSID endpoints) | *Rejected*; ZATCA's messages shown |
+| 401 | Wrong or missing credentials | *Failed*: "renew the CSID" |
+| 406 | Missing or unsupported `Accept-Version` | *Failed* |
+| 409 | Reporting: already reported earlier | *Reported*, with a note |
+| 428 | Renewal: `NOT_COMPLIANT` | Compliance checks run, then the production CSID |
+| 5xx, network | ZATCA or the connection failed | *Failed*; retry resends the same XML |
+
+The developer-portal sandbox doesn't detect duplicates (a resend gets 200 again), so 208 and 409 are
+covered by unit tests built from the API reference's example bodies, not by live calls.
 
 ## Files
 
@@ -57,7 +82,8 @@ Sales Invoice submit
 | `erp_overrides/zatca/crypto.py` | secp256k1 key, CSR with ZATCA's subject and SAN fields, invoice hash, ECDSA signature, XAdES block |
 | `erp_overrides/zatca/qr.py` | QR code: base64 TLV, tags 1–9 |
 | `erp_overrides/zatca/document.py` | One call: dict → signed XML with the QR written in |
-| `erp_overrides/zatca/client.py` | FATOORA API client: compliance, production CSID, clearance, reporting |
+| `erp_overrides/zatca/client.py` | FATOORA API client: compliance, production CSID, renewal, clearance, reporting; reads every error shape into readable lines |
+| `erp_overrides/zatca/tests/test_pure.py` | 20 unit tests: the Guideline's QR example, rounding, type codes, hash and signature, SignedProperties digest, CSR fields, API reply parsing |
 
 ### Frappe side
 
@@ -65,8 +91,8 @@ Sales Invoice submit
 |---|---|
 | `erp_overrides/zatca/mapping.py` | Sales Invoice → dict; `check()` lists what would make ZATCA reject it, in plain words |
 | `erp_overrides/zatca/submit.py` | Doc events, the chain, `send`, whitelisted `retry` and `qr_svg` |
-| `erp_overrides/zatca/onboarding.py` | Whitelisted `run`: CSR → compliance CSID → 6 compliance checks → production CSID |
-| `erp_overrides/erp_overrides/doctype/zatca_settings/` | Single doctype: company, environment, seller details, EGS serial, OTP, chain state, and encrypted credentials (Password fields, stored in the site database and never in git). Has an **Onboard** button |
+| `erp_overrides/zatca/onboarding.py` | Whitelisted `run` (CSR → compliance CSID → 6 compliance checks → production CSID, new chain) and `renew` (new CSR → renewed CSID, chain kept) |
+| `erp_overrides/erp_overrides/doctype/zatca_settings/` | Single doctype: company, environment, seller details, EGS serial, OTP, chain state, certificate expiry, and encrypted credentials (Password fields, stored in the site database and never in git). Has **Onboard** and **Renew CSID** buttons |
 | `erp_overrides/erp_overrides/doctype/zatca_submission/` | One row per signed document: ICV, UUID, hash, PIH, status, ZATCA's errors and warnings, response, signed and cleared XML |
 | `erp_overrides/patches/v1_0/zatca_2026_11.py` | Custom fields. On Sales Invoice: `zatca_status`, `zatca_submission`, `zatca_uuid`, `zatca_qr`. On Address: `zatca_building_number`, `zatca_district`, which ZATCA requires on B2B buyer addresses |
 | `erp_overrides/public/js/zatca_sales_invoice.js` | Status indicator, QR code, "Send to ZATCA again" and "ZATCA response" buttons |
@@ -90,9 +116,16 @@ Sales Invoice submit
    the SignedProperties digest and the first PIH are base64 of the *hex text* of the SHA-256.
 3. **C14N 1.1 vs 1.0.** The spec names C14N 1.1, and lxml only has 1.0. They differ only in
    `xml:id`/`xml:base` handling, which UBL invoices don't use, and the sandbox accepts our hashes.
+   The SignedProperties digest is *not* canonical XML at all: the text is hashed with `<ds:DigestMethod …/>`
+   left self-closed, which C14N would expand.
 4. **The developer portal gives everyone the same production certificate,** one that wasn't issued
    for your key. The sandbox accepts the signatures anyway, so matching key and certificate can only be
    tested in the simulation environment.
+5. **The developer portal doesn't detect duplicates or enforce the chain across calls.** A resent invoice
+   is cleared or reported again with 200, so the 208/409 handling and chain behaviour need the simulation
+   environment for a real test.
+6. **Some errors are plain text.** A malformed CSR gets `Invalid Request` and a bad `Accept-Version` gets a
+   sentence, not JSON; `Response.summary()` shows them as they are.
 
 ## Setup (once the remaining steps are done)
 
@@ -124,13 +157,26 @@ bench --site <site> migrate
 2. `erp_overrides/zatca/demo.py`: a fictional Saudi company (SAR, 15% VAT), plus a B2B and a B2C customer.
 3. Live run: Onboard, then a B2B invoice, a B2C invoice and a credit note. Then the failure path: a customer
    with a malformed VAT number gets a readable rejection, and fixing it then retrying works without breaking the chain.
-4. Unit tests for the pure modules (QR round trip, hash, the signature verifies) plus a GitHub Actions workflow;
-   integration tests with the ZATCA API mocked.
+4. A GitHub Actions workflow running `erp_overrides/zatca/tests` (the tests exist and pass);
+   Frappe integration tests for `send()` and the chain with the ZATCA API mocked.
 5. A section in the main README, an hours log, and a screen recording with a redacted sandbox log.
+
+## Running the tests
+
+The pure tests need only `lxml`, `cryptography` and `requests` (no site, no network):
+
+```bash
+python -m unittest erp_overrides.zatca.tests.test_pure -v     # or: pytest erp_overrides/zatca/tests
+```
 
 ## Specifications
 
-The PDFs aren't kept in this repo. Download them from ZATCA:
+The PDFs aren't kept in this repo (`docs/zatca/*.pdf` is git-ignored). Download them from ZATCA:
+
+- Sandbox API reference (Swagger, Sandbox Release 2.1.0), one page per endpoint: compliance CSID,
+  compliance invoices, production CSID (onboarding), renewal, clearance, reporting. Export them from the
+  [developer portal](https://sandbox.zatca.gov.sa/); kept locally as `compliance_csid.pdf`,
+  `compliance_invoice.pdf`, `onboarding.pdf`, `renewal.pdf`, `clearance.pdf` and `reporting.pdf`.
 
 - [E-invoicing Detailed Technical Guideline v2 (Nov 2022)](https://zatca.gov.sa/en/E-Invoicing/Introduction/Guidelines/Documents/E-invoicing-Detailed-Technical-Guideline.pdf): onboarding, signing steps, QR
 - [Electronic Invoice XML Implementation Standard v1.2 (May 2023)](https://zatca.gov.sa/ar/E-Invoicing/SystemsDevelopers/Documents/20230519_ZATCA_Electronic_Invoice_XML_Implementation_Standard_%20vF.pdf)

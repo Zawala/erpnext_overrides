@@ -134,31 +134,48 @@ def send(submission: str):
 	sub.attempts = cint(sub.attempts) + 1
 	sub.last_attempt = now_datetime()
 	invoice_update = {}
+	notes = []
+	xml = sub.signed_xml.encode()
 	try:
 		api = _client(settings)
-		post = api.clear if sub.kind == "Clearance" else api.report
-		r = post(sub.signed_xml.encode(), sub.invoice_hash, sub.uuid)
+		if sub.kind == "Clearance":
+			r = api.clear(xml, sub.invoice_hash, sub.uuid)
+			if r.status_code == client.CLEARANCE_OFF:
+				# ZATCA has switched clearance off: standard documents are reported instead
+				notes.append(_("Clearance is switched off at ZATCA, so this standard invoice was reported instead."))
+				r = api.report(xml, sub.invoice_hash, sub.uuid)
+		else:
+			r = api.report(xml, sub.invoice_hash, sub.uuid)
 	except Exception as e:  # network, DNS, timeouts: worth retrying as is
 		sub.status = "Failed"
 		sub.errors = f"{type(e).__name__}: {e}"
 	else:
 		sub.response = json.dumps(r.data, indent=1, ensure_ascii=False)
 		sub.errors = "\n".join(r.messages("errorMessages")) or None
-		sub.warnings = "\n".join(r.messages("warningMessages")) or None
-		if r.ok:
-			sub.status = "Accepted with warnings" if r.status_code == 202 else (
-				"Cleared" if sub.kind == "Clearance" else "Reported"
-			)
+		warnings = r.messages("warningMessages")
+		reported = "reportingStatus" in r.data or r.status_code == client.ALREADY_REPORTED
+		if r.ok or r.status_code in (client.ALREADY_CLEARED, client.ALREADY_REPORTED):
+			sub.status = "Accepted with warnings" if r.status_code == 202 else ("Reported" if reported else "Cleared")
+			sub.errors = None
+			if r.status_code == client.ALREADY_CLEARED:
+				notes.append(_("ZATCA had already cleared this document (HTTP 208); its stamped copy is kept."))
+			if r.status_code == client.ALREADY_REPORTED:
+				notes.append(_("ZATCA had already reported this document (HTTP 409)."))
 			if r.data.get("clearedInvoice"):
 				cleared = base64.b64decode(r.data["clearedInvoice"])
 				sub.cleared_xml = cleared.decode()
 				# the stamped invoice carries ZATCA's own QR; that's the one to print
 				invoice_update["zatca_qr"] = _qr_from_xml(cleared) or sub.qr
-		elif r.status_code == 400:
+		elif r.status_code == client.REJECTED:
 			sub.status = "Rejected"
-		else:  # 401 bad credentials, 429, 5xx: the document itself wasn't judged
+		else:  # 401, 406, 429, 5xx: the document itself wasn't judged, so it can be sent again as is
 			sub.status = "Failed"
-			sub.errors = sub.errors or f"HTTP {r.status_code}: {json.dumps(r.data)[:500]}"
+			sub.errors = (
+				_("ZATCA refused the credentials (HTTP 401). Renew the CSID in ZATCA Settings, then send again.")
+				if r.status_code == client.UNAUTHORIZED
+				else r.summary()
+			)
+		sub.warnings = "\n".join(notes + warnings) or None
 	sub.save(ignore_permissions=True)
 	frappe.db.set_value(
 		"Sales Invoice", sub.sales_invoice, {"zatca_status": sub.status, **invoice_update}, update_modified=False
