@@ -44,8 +44,16 @@ Results from live calls to `https://gw-fatoora.zatca.gov.sa/e-invoicing/develope
 | Outbox integration tests (ZATCA mocked) | 7/7 pass: missed job, backoff then success, network error, giving up after 10 attempts, no resend once settled, lock skip, overdue flag |
 | Zimbabwe demo company | No ZATCA activity |
 
-**Not checked in a browser yet:** the Desk buttons, status indicator and QR display
-(`zatca_sales_invoice.js`, the ZATCA Settings buttons).
+### In the browser (Desk, desktop and phone)
+
+The flows above were recorded in Chrome on desktop and at phone width (390 px). See the GIFs in the
+[root README](../../README.md#zatca-phase-2-e-invoicing-saudi-arabia) or in `docs/screenshots/zatca/`.
+- The QR and the *Send to ZATCA again* button show on the invoice. On a phone the button is in the **⋯** menu.
+- The ZATCA section of the invoice shows the status, submission and UUID.
+- ZATCA Settings shows the outbox summary and the **Onboard** / **Renew CSID** buttons.
+
+**Known gap:** the *ZATCA: Cleared* indicator that `zatca_sales_invoice.js` adds isn't visible on Frappe 16's invoice
+form, so the status is read from the ZATCA section for now.
 
 ## How it works
 
@@ -181,7 +189,8 @@ Or by hand:
 3. Tick **Send invoices to ZATCA** and save.
 4. B2B customers need: type *Company*, a VAT number, and an address with the *Building number (KSA)*
    and *District (KSA)* fields filled.
-5. Submit a Sales Invoice in SAR. After a few seconds it shows *ZATCA: Cleared* or *ZATCA: Reported* and a QR code.
+5. Submit a Sales Invoice in SAR. It shows a QR code straight away. After a few seconds (once the worker has sent it),
+   its ZATCA section shows *Cleared* or *Reported*.
 
 ## Limits of this POC
 
@@ -194,10 +203,11 @@ Or by hand:
 
 ## What's left
 
-1. Click through the Desk UI in a browser (buttons, indicator, QR) and fix anything that looks off.
-2. A GitHub Actions workflow running `erp_overrides/zatca/tests` (the tests exist and pass);
-   Frappe integration tests for `send()` and the chain with the ZATCA API mocked.
-3. A section in the main README, an hours log, and a screen recording with a redacted sandbox log.
+1. Show the ZATCA status next to the QR, where it's visible straight away (the dashboard indicator isn't shown on
+   Frappe 16).
+2. A GitHub Actions workflow running `erp_overrides/zatca/tests` (the tests exist and pass locally).
+3. A bilingual (Arabic/English) invoice print format with the QR.
+4. A run in ZATCA's simulation environment with a real taxpayer's OTP.
 
 ## Running the tests
 

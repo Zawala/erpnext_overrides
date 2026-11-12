@@ -1,5 +1,10 @@
 # ERPNext PWAs
 
+> **🇸🇦 ZATCA Phase 2 (Fatoora) e-invoicing for ERPNext: proof of concept.** Sales Invoices are signed in Python and
+> cleared or reported with ZATCA's sandbox, with retries, an outbox and readable rejections.
+> **Sandbox-tested only.** [See the demo and limitations ↓](#zatca-phase-2-e-invoicing-saudi-arabia) ·
+> [technical write-up](docs/zatca/README.md)
+
 Four mobile-first apps (sales, HR, accounts and admin) built on top of ERPNext and Frappe HR, plus the launcher everyone
 lands on after login. ERPNext still owns the data and does all the accounting. The apps give each team a simpler front door
 than desk: fewer fields, the next step suggested, the gaps behind "the numbers look wrong" flagged and fixable in one
@@ -18,6 +23,90 @@ published tax bands, and the central bank's daily rate. The screenshots below co
 | HR | `/hrms-admin` | Leave, payroll, claims, people and bi-weekly reviews | [hr-admin-pwa.md](docs/hr-admin-pwa.md) |
 | Accounts | `/accounts` | Bank reconciliation, money owed, payments, petty cash, exchange rates | [accounts-pwa.md](docs/accounts-pwa.md) |
 | Admin | `/sys-admin` | Users and roles, why someone can't open something, item prices and imports | [sysadmin-pwa.md](docs/sysadmin-pwa.md) |
+
+## ZATCA Phase 2 e-invoicing (Saudi Arabia)
+
+> **Status: proof of concept, sandbox only.** It runs end to end against ZATCA's public **developer-portal sandbox**. It
+> has not been run in ZATCA's simulation or production environments, and it is not a ZATCA-certified solution.
+
+`erp_overrides/zatca/` connects ERPNext to ZATCA's FATOORA platform:
+- Standard (B2B) invoices are sent for **clearance**.
+- Simplified (B2C) invoices are sent for **reporting**.
+- Credit and debit notes are covered too.
+
+The UBL 2.1 XML, invoice hash, XAdES signature and QR code are built in Python (`lxml` + `cryptography`), written directly
+from ZATCA's published specifications. There's no Java SDK and no shelling out. The module is off unless it's switched on
+for a company, so the rest of this repo is unaffected.
+
+### Demo
+
+Fictional demo data on ERPNext v16, sent live to the ZATCA sandbox.
+
+**1. Submit a B2B invoice: ZATCA clears it and returns its QR. Then a B2C invoice is reported.**
+
+| Desktop | Phone |
+|---|---|
+| ![Clearance and reporting, desktop](docs/screenshots/zatca/clearance-reporting-desktop.gif) | <img src="docs/screenshots/zatca/clearance-reporting-phone.gif" width="260" alt="Clearance and reporting, phone"> |
+
+**2. ZATCA rejects an invoice (buyer VAT number has 14 digits, rule BR-KSA-44). Sales fixes the customer, Accounts sends it again, and it's cleared.**
+
+| Desktop | Phone |
+|---|---|
+| ![Reject and retry, desktop](docs/screenshots/zatca/reject-retry-desktop.gif) | <img src="docs/screenshots/zatca/reject-retry-phone.gif" width="260" alt="Reject and retry, phone"> |
+
+### What it does
+
+- **Onboarding and renewal:**
+  - New key and CSR (secp256k1).
+  - Compliance CSID, then the six compliance checks (standard and simplified invoice, credit note and debit note), all
+    `PASS`.
+  - Production CSID.
+  - **Renew CSID** button.
+  - Credentials are stored encrypted in the site database, never in git.
+- **Clearance and reporting:**
+  - Real Sales Invoices come back **CLEARED** / **REPORTED** with no warnings, including credit notes and a 0% line with
+    an exemption code.
+  - Cleared invoices keep ZATCA's stamped XML and QR.
+- **Invoice chain:**
+  - The counter (ICV) and the previous-invoice hash (PIH) are handed out under a row lock inside the submit transaction.
+  - A rejected document stays in the chain, as ZATCA requires.
+  - Retry signs a new document; it never edits the old one.
+- **Outbox:**
+  - Every submitted invoice has a durable submission record.
+  - A sweeper sends anything the background job missed, and retries failures with backoff (1, 5, 15 and 60 minutes, then
+    hourly, up to 10 attempts).
+  - A row lock prevents two sends of the same document.
+  - An hourly check flags B2C invoices close to ZATCA's 24-hour reporting limit.
+- **Readable errors:**
+  - ZATCA's rejections are shown in plain words on the invoice.
+  - Missing B2B address fields are caught before signing.
+  - Cancelling an invoice ZATCA has accepted is blocked: a credit note is required instead.
+- **Tests:**
+  - 20 unit tests, including ZATCA's own worked QR example and reply bodies from the API reference.
+  - 7 outbox integration tests with ZATCA mocked.
+  - Tested on Frappe 16.51.1 and ERPNext 16.50.0.
+
+### Limitations
+
+- **Sandbox only:**
+  - The developer portal gives everyone the same certificate and doesn't detect duplicate submissions. So signing with
+    a key matched to its certificate, and the duplicate replies (HTTP 208 / 409), still need testing in the simulation
+    environment.
+  - The duplicate replies are handled in code and covered by unit tests.
+- **Scope:**
+  - One company and one EGS unit.
+  - SAR invoices only.
+  - VAT categories S (standard) and Z (zero-rated); E (exempt) and O (out of scope) aren't mapped.
+  - No document-level allowance or charge lines in the XML; discounts are carried in each line's net price.
+- **Not built yet:**
+  - A bilingual Arabic/English invoice print format. The QR is shown on the form.
+  - Batched reporting within the 24 hours.
+  - Multi-branch devices.
+- **Production needs:** the client's VAT number and CR, an OTP from their Fatoora portal, onboarding in simulation then
+  production, and their invoice templates.
+
+The design, ZATCA's reply codes, what the sandbox taught us, setup and tests are in **[docs/zatca/README.md](docs/zatca/README.md)**.
+[ERPGulf/zatca_erpgulf](https://github.com/ERPGulf/zatca_erpgulf) (MIT) is prior art. None of its code is used here.
 
 ## Screenshots
 
@@ -82,6 +171,16 @@ bench start
 
 Open http://demo.localhost:8000/launcher and log in as `Administrator` (the password you gave `new-site`), or as
 any demo user (`grace@example.com`, `ruth@example.com`, `daniel@example.com`, …) with the password `demo1234`.
+
+To try the ZATCA proof of concept on the same site, sending to ZATCA's public sandbox:
+
+```bash
+bench --site demo.localhost execute erp_overrides.zatca.demo.seed        # fictional Saudi company, 15% VAT, B2B and B2C customers
+bench --site demo.localhost execute erp_overrides.zatca.onboarding.run   # CSR → compliance checks → production CSID
+bench --site demo.localhost execute erp_overrides.zatca.demo.invoices    # a B2B invoice, a B2C invoice and a credit note
+```
+
+Then log in as `daniel@example.com` and open **ZATCA Settings** and **ZATCA Submission**, or any of the new Sales Invoices.
 
 For frontend development, run `cd frontend && yarn dev` (sales), `yarn dev:hr`, `yarn dev:accounts` or `yarn dev:sysadmin`.
 Each one proxies API calls to the bench.
